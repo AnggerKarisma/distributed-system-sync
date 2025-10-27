@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+aiohttp
+pydantic
+redis
+pytest
+pytest-asyncio
+httpx
+locust

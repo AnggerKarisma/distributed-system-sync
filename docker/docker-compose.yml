@@ -1,0 +1,76 @@
+version: '3.8'
+
+# Jaringan virtual agar semua container bisa saling "bicara"
+networks:
+  distributed_net:
+    driver: bridge
+
+services:
+  # Service 1: Database Redis kita
+  redis:
+    image: "redis:alpine"
+    container_name: redis_db
+    networks:
+      - distributed_net
+    # (Opsional) Buka port ke host/laptop Anda untuk debugging
+    ports:
+      - "6379:6379"
+
+  # Service 2: Node Aplikasi Pertama
+  node1:
+    build:
+      context: ..  # Pergi ke direktori root (di atas 'docker/')
+      dockerfile: docker/Dockerfile.node # Path ke Dockerfile
+    
+    # Baca file .env dari root (relative to this yml file)
+    env_file:
+      - ../.env
+    
+    # Variabel unik untuk container INI
+    environment:
+      - NODE_ID=http://node1:8080
+      - PEERS=http://node1:8080,http://node2:8080,http://node3:8080
+      - API_PORT=8080 # Port INTERNAL di dalam container
+    
+    ports:
+      - "8081:8080" # Map port 8081 (laptop) -> 8080 (container)
+    networks:
+      - distributed_net
+    depends_on:
+      - redis # Jangan jalankan node ini sebelum redis siap
+
+  # Service 3: Node Aplikasi Kedua
+  node2:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.node
+    env_file:
+      - ../.env
+    environment:
+      - NODE_ID=http://node2:8080 # <-- ID Unik
+      - PEERS=http://node1:8080,http://node2:8080,http://node3:8080
+      - API_PORT=8080
+    ports:
+      - "8082:8080" # <-- Port mapping unik
+    networks:
+      - distributed_net
+    depends_on:
+      - redis
+
+  # Service 4: Node Aplikasi Ketiga
+  node3:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.node
+    env_file:
+      - ../.env
+    environment:
+      - NODE_ID=http://node3:8080 # <-- ID Unik
+      - PEERS=http://node1:8080,http://node2:8080,http://node3:8080
+      - API_PORT=8080
+    ports:
+      - "8083:8080" # <-- Port mapping unik
+    networks:
+      - distributed_net
+    depends_on:
+      - redis
