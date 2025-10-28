@@ -116,10 +116,7 @@ class RaftNode:
                     self.state = NodeState.LEADER
                     self._init_leader_state()
                     return
-        
-        # Jika loop selesai tanpa jadi leader (split vote atau timeout),
-        # tetap jadi candidate dan timeout acak akan memulai election baru.
-        self.logger.info("Election failed or split vote. Retrying.")
+            self.logger.info("Election failed or split vote. Retrying.")
 
 
     async def run_leader(self):
@@ -145,8 +142,6 @@ class RaftNode:
     async def _replicate_log_to_peer(self, peer):
         peer_next_index = self.next_index[peer]
         
-        # Log Consistency Check
-        # Jika next_index > 0, kita perlu prevLogIndex dan prevLogTerm
         if peer_next_index > 0:
             prev_log_index = peer_next_index - 1
             prev_log_term = self.log[prev_log_index][0]
@@ -179,12 +174,9 @@ class RaftNode:
             return
 
         if resp['success']:
-            # Log berhasil direplikasi
             self.next_index[peer] = peer_next_index + len(entries)
             self.match_index[peer] = self.next_index[peer] - 1
         else:
-            # Log Gagal (Log Inconsistency)
-            # Mundurkan next_index dan coba lagi di heartbeat berikutnya
             self.next_index[peer] = max(0, self.next_index[peer] - 1)
             self.logger.warning(f"Log inconsistency for {peer}. Retrying with next_index={self.next_index[peer]}")
 
@@ -203,7 +195,6 @@ class RaftNode:
                     self.logger.debug(f"Updated commit_index to {self.commit_index}")
                     break # Kita hanya update ke N tertinggi
         
-        # Terapkan semua committed entries yang belum diterapkan
         while self.last_applied < self.commit_index:
             self.last_applied += 1
             command = self.log[self.last_applied][1]
@@ -220,18 +211,13 @@ class RaftNode:
 
         self.logger.info(f"Proposing new command: {command}")
         
-        # 1. Tambahkan ke log lokal
         self.log.append((self.current_term, command))
         last_log_index, _ = self.get_last_log_index_term()
         
-        # 2. Replikasi ke follower (ini akan terjadi di loop leader berikutnya,
-        #    tapi kita bisa picu sekarang untuk latensi lebih rendah)
         tasks = [self._replicate_log_to_peer(peer) for peer in self.peers]
         await asyncio.gather(*tasks, return_exceptions=True)
 
-        # 3. Tunggu sampai committed
-        # Dalam implementasi nyata, ini bisa pakai future/event
-        # Di sini kita polling sederhana
+       
         start_time = time.time()
         while time.time() - start_time < 2.0: # Timeout 2 detik
             await self._update_commit_index()

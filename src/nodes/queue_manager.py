@@ -26,8 +26,6 @@ class QueueManager:
             self.http_session = aiohttp.ClientSession()
         return self.http_session
 
-    # --- Logika Inti ---
-
     async def push_message(self, queue_name: str, message: str):
         """
         API untuk Klien: Mendorong pesan ke antrian.

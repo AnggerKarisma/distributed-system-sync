@@ -8,12 +8,8 @@ from consensus.raft import NodeState
 
 class LockManager:
     def __init__(self):
-        # Ini adalah State Machine yang direplikasi
-        # Format: self.locks[lock_id] = {'type': 'exclusive' | 'shared', 'owners': set(['client_a', 'client_b'])}
         self.locks = defaultdict(dict)
         
-        # Ini TIDAK direplikasi. Ini hanya untuk request yang sedang menunggu di node INI.
-        # Format: self.wait_queue[lock_id] = [asyncio.Event(), asyncio.Event()]
         self.wait_queue = defaultdict(list)
         
         self.logger = logging.getLogger("LockManager")
@@ -43,8 +39,6 @@ class LockManager:
                     # Tambahkan shared owner
                     self.locks[lock_id]['owners'].add(client_id)
                 else:
-                    # Ini seharusnya tidak terjadi jika 'check_lock' bekerja,
-                    # tapi ini adalah state machine, kita harus tangani.
                     self.logger.error(f"Failed to apply {command}: Lock conflict detected in state machine.")
                     
             elif op == 'release':

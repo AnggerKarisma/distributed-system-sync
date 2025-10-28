@@ -95,3 +95,42 @@ class QueueUser(HttpUser):
             json={"queue_name": queue_name, "timeout": 1},
             name="/queue/pop"
         )
+
+class CacheUser(HttpUser):
+    wait_time = between(0.01, 0.1) 
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.key_pool = [f"hotkey_{i}" for i in range(5)]
+        self.value_counter = 0
+
+    @task(10) # Bobot 10: Lebih banyak membaca
+    def read_from_cache_pool(self):
+        """
+        Skenario: Membaca data dari 'hot-spot' pool.
+        Ini akan sering menyebabkan state E -> S atau S -> S.
+        """
+        key = random.choice(self.key_pool)
+        
+        self.client.post(
+            "/cache/read",
+            json={"key": key},
+            name="/cache/read (Hot Pool)"
+        )
+
+    @task(2) # Bobot 2: Sesekali menulis
+    def write_to_cache_pool(self):
+        """
+        Skenario: Menulis data ke 'hot-spot' pool.
+        Ini AKAN memicu invalidation (transisi S -> M).
+        Ini adalah tes performa yang sebenarnya.
+        """
+        key = random.choice(self.key_pool)
+        self.value_counter += 1
+        value = f"new_val_{self.value_counter}"
+        
+        self.client.post(
+            "/cache/write",
+            json={"key": key, "value": value},
+            name="/cache/write (Invalidation)"
+        )
